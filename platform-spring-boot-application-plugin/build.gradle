@@ -1,0 +1,74 @@
+// platform-spring-boot-application-plugin
+// Publishes plugin id: space.br1440.platform.spring-boot-application
+//                 GAV: space.br1440.platform:platform-spring-boot-application:<version>
+//
+// Convention plugin for Spring Boot services. Applying it gives:
+//   - Java toolchain at the platform-mandated language version
+//   - org.springframework.boot (version pinned by the settings plugin)
+//   - platform-bom injected as a platform(...) dependency across all six configurations
+//   - io.spring.dependency-management is NOT applied (native BOM support is used)
+
+plugins {
+    id 'groovy-gradle-plugin'
+    id 'platform-nexus-publishing'
+    id 'platform-plugin-functional-testing'
+}
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+def springBootVersion = platformCatalog.findVersion('spring-boot')
+        .orElseThrow {
+            new GradleException('platform-catalog TOML: missing [versions] spring-boot')
+        }
+        .requiredVersion
+
+dependencies {
+    // Must be a runtime dependency, not compileOnly: pluginManager.apply('...') resolves
+    // the plugin from this plugin's own classpath. A pluginManagement entry only governs
+    // `plugins { }` blocks in build scripts, so it cannot satisfy a programmatic apply.
+    //
+    // The Boot plugin therefore reaches the consumer's buildscript classpath at the
+    // version pinned here. That is the intent: the platform release decides the Spring
+    // Boot version. The same version is exposed to services through the settings
+    // plugin's pluginManagement entry, so both application paths agree.
+    implementation "org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}"
+
+    // Brings PlatformFunctionalSpec along with TestKit and Spock.
+    testImplementation project(':platform-gradle-test-support')
+}
+
+// Shared functional-test wiring comes from platform-plugin-functional-testing.
+tasks.named('test', Test) {
+    // Expectations are sourced from the catalog, not from PlatformReleaseMetadata:
+    // that class belongs to the settings plugin, and a test dependency on it would
+    // couple two independently published plugins.
+    systemProperty 'platform.spring.boot.version', springBootVersion
+    systemProperty 'platform.java.version', platformCatalog.findVersion('java').get().requiredVersion
+}
+
+gradlePlugin {
+    plugins {
+        platformSpringBootApplication {
+            id                  = 'space.br1440.platform.spring-boot-application'
+            implementationClass = 'space.br1440.platform.gradle.PlatformSpringBootApplicationPlugin'
+            displayName         = 'Platform Spring Boot Application Convention Plugin'
+            description         = 'Applies Spring Boot, the platform Java toolchain, and imports '\
+                                + 'platform-bom. Services need only this one plugin.'
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------------
+// Publishing
+// -----------------------------------------------------------------------------------
+
+publishing {
+    publications.withType(MavenPublication).configureEach {
+        // Without this the implementation JAR would be published as
+        // 'platform-spring-boot-application-plugin' (the Gradle project name),
+        // breaking the documented GAV contract.
+        if (name == 'pluginMaven') {
+            artifactId = 'platform-spring-boot-application'
+        }
+    }
+}

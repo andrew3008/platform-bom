@@ -1,0 +1,26 @@
+plugins {
+    id 'version-catalog'
+    id 'platform-nexus-publishing'
+}
+
+catalog {
+    versionCatalog {
+        from(files(layout.projectDirectory.file('gradle/platform-catalog.versions.toml')))
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'platform-catalog'
+            version = project.version
+
+            from components.versionCatalog
+
+            pom {
+                name = 'Platform Catalog'
+                description = 'Published Gradle Version Catalog for space.br1440.platform consumers'
+            }
+        }
+    }
+}

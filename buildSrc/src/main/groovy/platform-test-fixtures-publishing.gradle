@@ -1,0 +1,14 @@
+import space.br1440.platform.build.TestFixtureRepository
+
+plugins {
+    id 'maven-publish'
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'testFixtures'
+            url = TestFixtureRepository.dir(project).toURI()
+        }
+    }
+}

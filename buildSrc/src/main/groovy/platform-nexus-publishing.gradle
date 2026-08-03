@@ -1,0 +1,37 @@
+plugins {
+    id 'platform-test-fixtures-publishing'
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'nexusSnapshot'
+            url = uri('https://n.1440.space/repository/platform-maven-dev')
+            credentials(PasswordCredentials)
+        }
+        maven {
+            name = 'nexusRelease'
+            url = uri('https://n.1440.space/repository/platform-maven')
+            credentials(PasswordCredentials)
+        }
+    }
+}
+
+tasks.register('publishAllToMavenLocal') {
+    group = 'publishing'
+    description = "Publishes ${project.name} to Maven Local"
+    dependsOn 'publishToMavenLocal'
+}
+
+tasks.register('publishAllToNexus') {
+    group = 'publishing'
+    description = "Publishes ${project.name} to Nexus (snapshot/release resolved by version)"
+
+    def isSnapshot = project.provider { project.version.toString().endsWith('-SNAPSHOT') }
+
+    dependsOn(isSnapshot.map { snapshot ->
+        snapshot
+                ? 'publishAllPublicationsToNexusSnapshotRepository'
+                : 'publishAllPublicationsToNexusReleaseRepository'
+    })
+}

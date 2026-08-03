@@ -1,0 +1,116 @@
+plugins {
+    id 'groovy-gradle-plugin'
+    id 'platform-nexus-publishing'
+    id 'platform-plugin-functional-testing'
+}
+
+// -----------------------------------------------------------------------------------
+// Генерация кода release-метаданных
+// -----------------------------------------------------------------------------------
+
+abstract class GenerateReleaseMetadata extends DefaultTask {
+
+    @Input
+    abstract Property<String> getReleaseVersion()
+
+    @Input
+    abstract Property<String> getSpringBootVersion()
+
+    @Input
+    abstract Property<String> getJavaVersion()
+
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void generate() {
+        def packageDir = outputDir.get().asFile.toPath()
+                .resolve('space/br1440/platform/gradle')
+                .toFile()
+        packageDir.mkdirs()
+
+        new File(packageDir, 'PlatformReleaseMetadata.groovy').text = """\
+package space.br1440.platform.gradle
+
+/**
+ * Константы времени компиляции для Platform Release Pack.
+ *
+ * СГЕНЕРИРОВАННЫЙ ФАЙЛ — НЕ РЕДАКТИРОВАТЬ.
+ * Источник истины: platform-catalog/gradle/platform-catalog.versions.toml
+ * Генерируется: :platform-settings-plugin:generatePlatformReleaseMetadata
+ *
+ * Значения сохраняются в JAR settings-плагина во время сборки.
+ */
+final class PlatformReleaseMetadata {
+
+    /** Текущая версия релиза платформы (общая для BOM, каталога и обоих плагинов). */
+    static final String RELEASE_VERSION = '${releaseVersion.get()}'
+
+    /** Версия Spring Boot, поставляемая с этим релизом платформы. */
+    static final String SPRING_BOOT_VERSION = '${springBootVersion.get()}'
+
+    /** Версия языка Java, предписанная этим релизом платформы. */
+    static final String JAVA_VERSION = '${javaVersion.get()}'
+
+    /**
+     * GAV публикуемого платформенного Version Catalog.
+     */
+    static final String CATALOG_GAV =
+            'space.br1440.platform:platform-catalog:' + RELEASE_VERSION
+
+    private PlatformReleaseMetadata() {}
+}
+"""
+    }
+}
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+def catalogVersion = { String alias ->
+    platformCatalog.findVersion(alias)
+            .orElseThrow {
+                new GradleException("platform-catalog TOML: missing [versions] ${alias}")
+            }
+            .requiredVersion
+}
+
+def generateReleaseMetadata = tasks.register('generatePlatformReleaseMetadata', GenerateReleaseMetadata) {
+    releaseVersion = catalogVersion('platform-release')
+    springBootVersion = catalogVersion('spring-boot')
+    javaVersion = catalogVersion('java')
+    outputDir = layout.buildDirectory.dir('generated/sources/platformReleaseMetadata/groovy/main')
+}
+
+sourceSets.main.groovy.srcDir generateReleaseMetadata
+
+// -----------------------------------------------------------------------------------
+// Объявление плагина
+// -----------------------------------------------------------------------------------
+
+dependencies {
+    testImplementation project(':platform-gradle-test-support')
+}
+
+gradlePlugin {
+    plugins {
+        platformSettings {
+            id                  = 'space.br1440.platform.settings'
+            implementationClass = 'space.br1440.platform.gradle.PlatformSettingsPlugin'
+            displayName         = 'Platform Settings Plugin'
+            description         = 'Bootstrap plugin: configures repositories, pluginManagement, '\
+                                + 'and imports platform-catalog for consuming services.'
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------------
+// Publishing
+// -----------------------------------------------------------------------------------
+
+publishing {
+    publications.withType(MavenPublication).configureEach {
+        if (name == 'pluginMaven') {
+            artifactId = 'platform-settings'
+        }
+    }
+}

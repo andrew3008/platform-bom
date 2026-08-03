@@ -1,0 +1,37 @@
+plugins {
+    id 'groovy-gradle-plugin'
+    id 'platform-nexus-publishing'
+    id 'platform-plugin-functional-testing'
+}
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+dependencies {
+    testImplementation project(':platform-gradle-test-support')
+}
+
+tasks.named('test', Test) {
+    systemProperty 'platform.java.version', platformCatalog.findVersion('java').get().requiredVersion
+    systemProperty 'platform.commons.lang3.version',
+            platformCatalog.findVersion('commons-lang3').get().requiredVersion
+}
+
+gradlePlugin {
+    plugins {
+        platformLibrary {
+            id                  = 'space.br1440.platform.library'
+            implementationClass = 'space.br1440.platform.gradle.PlatformLibraryPlugin'
+            displayName         = 'Platform Java Library Convention Plugin'
+            description         = 'Applies java-library, the platform Java toolchain, and imports ' \
+                                + 'platform-bom. Pure libraries need only this one project plugin.'
+        }
+    }
+}
+
+publishing {
+    publications.withType(MavenPublication).configureEach {
+        if (name == 'pluginMaven') {
+            artifactId = 'platform-library'
+        }
+    }
+}

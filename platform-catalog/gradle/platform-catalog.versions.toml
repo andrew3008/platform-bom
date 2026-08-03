@@ -1,0 +1,37 @@
+# Platform Catalog TOML
+# Этот файл — КОНТРАКТ ДАННЫХ для всех потребляющих сервисов.
+# Публикуется как space.br1440.platform:platform-catalog и импортируется
+# автоматически платформенным settings-плагином.
+#
+# Accessor в build-файлах сервисов: platform.<alias>
+# Пример: implementation(platform.commonsLang3)
+#
+# Spring Boot starter'ы НЕ являются алиасами каталога: сервисы объявляют их по координате
+# (например, 'org.springframework.boot:spring-boot-starter-web'), а версию поставляет
+# platform-bom, инжектируемый convention-плагинами. Алиас каталога только дублировал бы
+# этот путь резолвинга, не добавляя собственной версии.
+
+[versions]
+spring-boot             = "3.5.16"
+java                    = "21"
+commons-lang3           = "3.20.0"
+jetbrains-annotations   = "26.1.0"
+
+# Spock для тестирования Gradle-плагинов.
+spock                   = "2.3-groovy-3.0"
+
+# Platform Release Pack — используется внутренне и в bootstrap settings-плагина
+platform-release        = "1.0.0"
+
+[libraries]
+# BOM — инжектируется application- и library-convention-плагинами.
+# Build-скрипты потребителей НЕ должны ссылаться на него напрямую; это делает convention-плагин.
+platform-bom = { group = "space.br1440.platform", name = "platform-bom", version.ref = "platform-release" }
+
+# Алиасы стандартных библиотек, доступные сервисам
+commons-lang3           = { group = "org.apache.commons",  name = "commons-lang3",  version.ref = "commons-lang3" }
+jetbrains-annotations   = { group = "org.jetbrains",       name = "annotations",    version.ref = "jetbrains-annotations" }
+
+# Тестирование Gradle-плагинов. Используется самим релизным пакетом и доступно сервисам,
+# которые пишут свои собственные convention-плагины.
+spock-core              = { group = "org.spockframework",  name = "spock-core",     version.ref = "spock" }

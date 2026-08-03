@@ -1,0 +1,40 @@
+include:
+  - component: $CI_SERVER_FQDN/pe/cicd/catalog/java/gitlab-ci@~latest
+    inputs:
+      kubedock-enabled: true
+  - component: $CI_SERVER_FQDN/pe/cicd/catalog/semantic-release/gitlab-ci@~latest
+
+
+variables:
+  GRADLE_IMAGE: r.1440.space/dockerhub/gradle:8.12.0-jdk21
+  GRADLE_BUILD_ARGS: "build --info"
+  GRADLE_PUBLISH_ENABLED: true
+  GRADLE_PUBLISH_ARGS: "publishAllToNexus --info"
+  GRADLE_SBOM_VERSION: disabled
+  GRADLE_DEPENDENCY_CHECK_DISABLED: true
+
+  # Publishing credentials.
+  #
+  # credentials(PasswordCredentials) resolves Gradle properties named after the
+  # repository: nexusSnapshotUsername / nexusSnapshotPassword and the release pair.
+  # Gradle reads them from ORG_GRADLE_PROJECT_*-prefixed environment variables at
+  # execution time, so the values never enter the configuration cache entry.
+  #
+  # The corporate CI supplies PROD_NEXUS_USERNAME / PROD_NEXUS_PASSWORD, hence the
+  # mapping below. Do NOT replace this with an eager
+  # `credentials { username = provider.getOrNull() }` block in the build scripts:
+  # that form resolves the secret at configuration time and writes it to disk.
+  ORG_GRADLE_PROJECT_nexusSnapshotUsername: $PROD_NEXUS_USERNAME
+  ORG_GRADLE_PROJECT_nexusSnapshotPassword: $PROD_NEXUS_PASSWORD
+  ORG_GRADLE_PROJECT_nexusReleaseUsername: $PROD_NEXUS_USERNAME
+  ORG_GRADLE_PROJECT_nexusReleasePassword: $PROD_NEXUS_PASSWORD
+
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_FORCE_HTTPS: true
+
+  DEV_REF: /^(master|develop|feature\/.*|release\/.*)$/
+  STAGING_REF: /^(v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\-]+)?|release\/.*)$/
+  PROD_REF: /^v?[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9\-]+)?$/
+
+  SONAR_DISABLED: true

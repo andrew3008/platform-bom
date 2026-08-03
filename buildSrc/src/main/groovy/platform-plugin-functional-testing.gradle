@@ -1,0 +1,32 @@
+import space.br1440.platform.build.TestFixtureRepository
+
+pluginManager.withPlugin('java') {
+    tasks.named('test', Test) {
+        useJUnitPlatform()
+
+        dependsOn ':publishTestFixtures'
+
+        systemProperty 'platform.fixture.repo', TestFixtureRepository.dir(project).absolutePath
+        systemProperty 'platform.release.version', project.version.toString()
+        systemProperty 'test.offline', providers.systemProperty('test.offline').orElse('false').get()
+
+        def localInitFromProperty = providers.systemProperty('platform.local.init.script')
+                .orElse(providers.gradleProperty('platform.local.init.script'))
+                .orElse('')
+                .get()
+
+        def localInitFile = localInitFromProperty
+                ? new File(localInitFromProperty)
+                : rootProject.file('../local-offline-init.gradle')
+
+        if (localInitFile.isFile()) {
+            systemProperty 'platform.local.init.script', localInitFile.absolutePath
+        }
+    }
+}
+
+pluginManager.withPlugin('java-gradle-plugin') {
+    tasks.named('check') {
+        dependsOn tasks.named('validatePlugins')
+    }
+}

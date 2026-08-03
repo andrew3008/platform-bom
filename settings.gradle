@@ -1,0 +1,64 @@
+// Platform Release Pack — settings.
+//
+// Политика версионирования (требование архитектурного комитета):
+//   platform-catalog/gradle/platform-catalog.versions.toml — ЕДИНСТВЕННЫЙ источник
+//   версий зависимостей. Он регистрируется ниже как каталог версий 'platform'
+//   и читается каждым модулем через VersionCatalogsExtension.
+//
+// Политика репозиториев: fail-closed. Объявлены только внутренние прокси Nexus.
+// gradlePluginPortal(), mavenCentral() и mavenLocal() намеренно отсутствуют:
+//   - публичные репозитории — риск для цепочки поставок и уже проксируются Nexus;
+//   - mavenLocal() делает сборки невоспроизводимыми (результат зависит от ~/.m2).
+
+pluginManagement {
+    // Bootstrap-пин. Не может жить в TOML: convention-плагины должны быть
+    // разрешимы до того, как материализуется каталог версий. Область действия —
+    // только этот репозиторий: потребляющие сервисы никогда не применяют
+    // platform.java-platform-publish.
+    def platformConventionsVersion = '1.0.3'
+
+    repositories {
+        maven { url = uri('https://n.1440.space/repository/platform-maven/') }
+        maven { url = uri('https://n.1440.space/repository/platform-maven-dev/') }
+        maven { url = uri('https://n.1440.space/repository/plugins.gradle.org-proxy/') }
+        maven { url = uri('https://n.1440.space/repository/repo1.maven.org-proxy') }
+    }
+
+    plugins {
+        id 'platform.java-platform-publish' version platformConventionsVersion
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+
+    repositories {
+        // releasesOnly() намеренно отсутствует: platform-maven-dev несёт snapshot-линию
+        // и должен оставаться потребляемым.
+        maven { url = uri('https://n.1440.space/repository/platform-maven/') }
+        maven { url = uri('https://n.1440.space/repository/platform-maven-dev/') }
+        maven { url = uri('https://n.1440.space/repository/plugins.gradle.org-proxy/') }
+        maven { url = uri('https://n.1440.space/repository/repo1.maven.org-proxy') }
+    }
+
+    versionCatalogs {
+        // Тот же TOML, что публикуется как space.br1440.platform:platform-catalog.
+        // Модули читают его через VersionCatalogsExtension, никогда через
+        // типобезопасные accessor'ы: accessor назывался бы 'platform' и конфликтовал
+        // бы с нотацией DependencyHandler.platform(...) внутри блоков dependencies { }.
+        platform {
+            from(files('platform-catalog/gradle/platform-catalog.versions.toml'))
+        }
+    }
+}
+
+rootProject.name = 'platform-release-pack'
+
+include 'platform-bom'
+include 'platform-catalog'
+include 'platform-settings-plugin'
+include 'platform-spring-boot-application-plugin'
+include 'platform-library-plugin'
+
+// Внутренний, никогда не публикуется. Исключён из списка релизного пакета в publishTestFixtures.
+include 'platform-gradle-test-support'

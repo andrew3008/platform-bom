@@ -1,0 +1,11 @@
+plugins {
+    id 'groovy'
+    id 'java-library'
+}
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+dependencies {
+    api gradleTestKit()
+    api platformCatalog.findLibrary('spock-core').get()
+}

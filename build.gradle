@@ -1,0 +1,62 @@
+// Корневая сборка: координаты, общие для всех платформенных модулей.
+//
+// Версия релиза берётся из TOML платформенного каталога, а не из
+// gradle.properties. Есть ровно одно место для повышения версии релиза:
+//   platform-catalog/gradle/platform-catalog.versions.toml -> [versions] platform-release
+//
+// Publishing-репозитории здесь НЕ настраиваются. Кросс-проектная конфигурация через
+// subprojects { } враждебна к configuration cache и ранее приводила к появлению
+// второго, конфликтующего publishing-репозитория рядом с тем, что предоставляет
+// platform.java-platform-publish. Каждый модуль объявляет свой publishing-блок сам.
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+def releaseVersion = platformCatalog.findVersion('platform-release')
+        .orElseThrow {
+            new GradleException(
+                    'platform-catalog TOML: missing [versions] platform-release. ' +
+                    'The platform release version is owned by ' +
+                    'platform-catalog/gradle/platform-catalog.versions.toml.')
+        }
+        .requiredVersion
+
+allprojects {
+    group = 'space.br1440.platform'
+    version = releaseVersion
+}
+
+// -----------------------------------------------------------------------------------
+// Фикстуры для функциональных тестов
+// -----------------------------------------------------------------------------------
+//
+// TestKit-сборки не видят проекты этой сборки. Раньше функциональные тесты
+// полагались на withPluginClasspath(), который инжектирует classpath только того
+// модуля, которому принадлежит тест — поэтому фикстура, применяющая settings-плагин
+// из одного модуля и application-плагин из другого, никогда не могла разрешить оба,
+// а любая фикстура, импортирующая space.br1440.platform:platform-catalog, требовала
+// артефакт, который никогда не публиковался. Из-за этого ни один контракт C1-C11 не
+// мог быть выполнен.
+//
+// Вместо этого все модули релизного пакета публикуются в локальный репозиторий, из
+// которого их резолвят фикстуры — так реальные опубликованные артефакты
+// проверяются end-to-end.
+//
+// Путь к репозиторию живёт в buildSrc (TestFixtureRepository) и общий для
+// publishing- и functional-testing-конвенций.
+
+// Список задан явно, а не выведен из subprojects: platform-gradle-test-support —
+// внутренний для сборки модуль без публикаций, и перебор subprojects потребовал бы
+// от него publish-задачу, которой у него нет.
+def releasePackModules = [
+        'platform-bom',
+        'platform-catalog',
+        'platform-settings-plugin',
+        'platform-spring-boot-application-plugin',
+        'platform-library-plugin',
+]
+
+tasks.register('publishTestFixtures') {
+    group = 'verification'
+    description = 'Publishes all platform artifacts to the local repository used by functional tests'
+    dependsOn releasePackModules.collect { ":${it}:publishAllPublicationsToTestFixturesRepository" }
+}

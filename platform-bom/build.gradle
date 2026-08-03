@@ -1,0 +1,34 @@
+plugins {
+    id 'platform.java-platform-publish'
+    id 'platform-test-fixtures-publishing'
+}
+
+platformJavaPlatformPublish {
+    pomName = 'Platform BOM'
+    pomDescription = 'Common Java platform BOM for platform repositories space.br1440.platform'
+    useVersionMappingFromResolution = true
+}
+
+def platformCatalog = extensions.getByType(VersionCatalogsExtension).named('platform')
+
+def springBootVersion = platformCatalog.findVersion('spring-boot')
+        .orElseThrow {
+            new GradleException('platform-catalog TOML: missing [versions] spring-boot')
+        }
+        .requiredVersion
+
+def catalogLibrary = { String alias ->
+    platformCatalog.findLibrary(alias)
+            .orElseThrow {
+                new GradleException("platform-catalog TOML: missing [libraries] ${alias}")
+            }
+}
+
+dependencies {
+    api platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}")
+
+    constraints {
+        api catalogLibrary('commons-lang3')
+        api catalogLibrary('jetbrains-annotations')
+    }
+}
